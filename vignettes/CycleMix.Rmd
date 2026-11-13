@@ -91,9 +91,9 @@ all_data_joined <- SeuratObject::JoinLayers(all_data)
 all_data_joined <- Seurat::NormalizeData(all_data_joined)
 ```
 
-Alternatively, using SCTransform on the entire object will automatically join the layers together.
+If you are running on SCT-normalized values these are automatically joined in the "SCT" assay, but it is recommended to join the layers in all assays as shown above.
 ```{r}
-all_data_sct <- Seurat::SCTransform(all_data)
+all_data_sct <- Seurat::SCTransform(all_data_joined)
 ```
 
 ## Normalized / Batch Corrected expression matrix
@@ -189,9 +189,9 @@ table(output2$phase, output3$phase)
 We can then add the phase information to the Seurat Object.
 
 ```{r}
-all_data_sct@meta.data$Phase <- output2$phase
-all_data_sct@meta.data$G1S_score <- output2$scores[,"G1S"]
-all_data_sct@meta.data$G2M_score <- output2$scores[,"G2M"]
+all_data_sct[[]]$Phase <- output2$phase
+all_data_sct[[]]$G1S_score <- output2$scores[,"G1S"]
+all_data_sct[[]]$G2M_score <- output2$scores[,"G2M"]
 ```
 
 ## matrix / Sparse Matrix
@@ -236,8 +236,12 @@ data.frame(original=orig_pearson[1:5,G1S_cells[1]], not_corrected=corrected_pear
 The corrected values can then be added to our Seurat Object as a new assay, or by replacing the existing pearson residuals:
 
 ```{r}
-all_data_sct@assays$CC_corrected <- CreateAssayObject(data=corrected_pearson) # create a new assay 
-all_data_sct@assays$SCT$scale.data <- corrected_pearson # replace the existing pearson residuals
+# Create new assay for our corrected values:
+tmp <- CreateAssayObject(data=corrected_pearson) # create a new assay
+tmp$counts <- GetAssayData(all_data_sct, assay="RNA", layer="counts") # note your RNA layer must be joined prior to this step
+all_data_sct[['CC_corrected']] <- tmp
+# replace existing SCT Pearson residuals:
+all_data_sct[['SCT']]$scale.data <- corrected_pearson
 ```
 
 If we were instead using log-normalized expression values, we would specify that they are normalized but that the regressed values should not be negative:
